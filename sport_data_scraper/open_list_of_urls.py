@@ -1,7 +1,7 @@
 import webbrowser
 import time
 
-f = open("notBothTeamToScore.txt", "r")
+f = open("result1.txt", "r")
 
 count = 0
 for url in f:

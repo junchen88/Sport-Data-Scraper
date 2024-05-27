@@ -3,8 +3,9 @@ import re
 import webbrowser
 import time
 import tqdm
+import argparse
 
-def getData():
+def getData(day):
     # cookies = {
     #     "Cookie": "OptanonConsent=isGpcEnabled=0&datestamp=Sun+Nov+07+2021+00%3A01%3A15+GMT%2B0800+(Australian+Western+Standard+Time)&version=6.19.0&isIABGlobal=false&hosts=&landingPath=NotLandingPage"
     # }
@@ -26,7 +27,8 @@ def getData():
         "X-Referer": "https://www.flashscore.com.au/football/",
         "X-Requested-With": "XMLHttpRequest",
     }
-    response        = session.get("https://d.flashscore.com.au/x/feed/f_1_1_8_en-au_1", headers=headers, stream=True)#, cookies=cookies)#, cookies=cookies)
+    requesturl = f"https://d.flashscore.com.au/x/feed/f_1_{day}_8_en-au_1"
+    response        = session.get(requesturl, headers=headers, stream=True)#, cookies=cookies)#, cookies=cookies)
     result          = response.text
     # print(result)
     # print(len(result))
@@ -249,7 +251,11 @@ def findSuitableH2H(allH2HResult):
     writeToFile("notBothTeamToScore.txt", notBothTeamToScoreMatch)
 
 def main():
-    findSuitableH2H(getH2HResult(getData()))
+    parser=argparse.ArgumentParser(description="Help menu for the sport data scraper")
+    parser.add_argument("day", nargs='?',default=0,choices=[0,1,2,3,4,5,6], help="0 = today, 1 = tommorow...")
+    args=parser.parse_args()
+    print(args.day)
+    findSuitableH2H(getH2HResult(getData(args.day)))
 
 if __name__ == "__main__":
     main()
