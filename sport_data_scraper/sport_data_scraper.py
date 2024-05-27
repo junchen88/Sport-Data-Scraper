@@ -31,7 +31,7 @@ def getData():
     # print(result)
     # print(len(result))
     matchStrings    = re.findall(r'~AA÷(.*?)¬AD÷', result)
-    print(str(len(matchStrings)) + "matches found")
+    print(str(len(matchStrings)) + " matches found")
     session.close()
     return matchStrings
 
@@ -248,9 +248,9 @@ def findSuitableH2H(allH2HResult):
     writeToFile("bothTeamToScore.txt", bothTeamToScoreMatch)
     writeToFile("notBothTeamToScore.txt", notBothTeamToScoreMatch)
 
-# def main():
-#     findSuitableH2H(getH2HResult(getData()))
+def main():
+    findSuitableH2H(getH2HResult(getData()))
 
 if __name__ == "__main__":
-    findSuitableH2H(getH2HResult(getData()))
+    main()
 
