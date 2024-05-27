@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "sport_data_scraper"
+version = "0.1.0"
+description = "Tool for finding statistics for sports like soccer, basketball, etc"
+authors = ["junchen88 <jimmy181820@gmail.com>"]
+license = "GPL-3.0 license"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+my-scraper = "sport_data_scraper.sport_data_scraper:main"
