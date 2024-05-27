@@ -123,9 +123,9 @@ def writeToFile(filename, webLinks):
 
 def findSuitableH2H(allH2HResult):
     print("filtering results now...")
-    threshold = 5
-    underThreshold = 3
-    goodMatch = []
+    goalNumThreshold = 5
+    underGoalNumThreshold = 3
+    overGoalMatch = []
     underMatch = []
     winMatch = []
     bothTeamToScoreMatch = []
@@ -137,7 +137,7 @@ def findSuitableH2H(allH2HResult):
     print(allH2HResult)
     for result in allH2HResult:
 
-        lastFiveCount   = 0
+        noOfMatches   = 0
         SuitableCount   = 0
         SuitableUnder   = True
         SuitableWCount  = 0
@@ -182,7 +182,7 @@ def findSuitableH2H(allH2HResult):
                 continue
 
 #           ONLY CHECKS FOR THE LAST 4 MATCHES
-            if lastFiveCount < 4:
+            if noOfMatches < 4:
                 if result['home'] in result['H2HTeamData'][matchCounter]:
                     home = result['home']
                     away = result['away']
@@ -210,18 +210,18 @@ def findSuitableH2H(allH2HResult):
 
 
 #               ALSO CHECKS FOR NOT SUITABLE UNDER GOAL
-                if goalCount >= threshold:
+                if goalCount >= goalNumThreshold:
                     SuitableCount += 1
 
 
-                if goalCount >= underThreshold:
+                if goalCount >= underGoalNumThreshold:
                     SuitableUnder = False
 
-                lastFiveCount += 1
+                noOfMatches += 1
 
 
             else:
-                if goalCount >= underThreshold:
+                if goalCount >= underGoalNumThreshold:
                     SuitableUnder = False
                 if count == 5:
                     break
@@ -230,7 +230,7 @@ def findSuitableH2H(allH2HResult):
             count += 1
 
         if SuitableCount > 2:
-            goodMatch.append(createLinks(ID))
+            overGoalMatch.append(createLinks(ID))
 
         if count > 4 and SuitableUnder == True:
             underMatch.append(createLinks(ID))
@@ -238,13 +238,13 @@ def findSuitableH2H(allH2HResult):
         if SuitableWin == True and SuitableWCount == 4:
             winMatch.append(createLinks(ID))
 
-        if lastFiveCount >= 4 and SuitableBothTeamToScore == True:
+        if noOfMatches >= 4 and SuitableBothTeamToScore == True:
             bothTeamToScoreMatch.append(createLinks(ID))
 
-        if lastFiveCount >= 4 and SuitableNotBothTeamToScore == True:
+        if noOfMatches >= 4 and SuitableNotBothTeamToScore == True:
             notBothTeamToScoreMatch.append(createLinks(ID))
 
-    writeToFile("result1.txt", goodMatch)
+    writeToFile("over.txt", overGoalMatch)
     writeToFile("under.txt", underMatch)
     writeToFile("win.txt", winMatch)
     writeToFile("bothTeamToScore.txt", bothTeamToScoreMatch)
@@ -252,7 +252,7 @@ def findSuitableH2H(allH2HResult):
 
 def main():
     parser=argparse.ArgumentParser(description="Help menu for the sport data scraper")
-    parser.add_argument("day", nargs='?',default=0,choices=[0,1,2,3,4,5,6], help="0 = today, 1 = tommorow...")
+    parser.add_argument("day", nargs='?',default="0",choices=["0","1","2","3","4","5","6"], help="0 = today, 1 = tommorow...")
     args=parser.parse_args()
     print(args.day)
     findSuitableH2H(getH2HResult(getData(args.day)))
