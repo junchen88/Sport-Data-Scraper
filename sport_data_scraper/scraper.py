@@ -200,10 +200,10 @@ def findSuitableH2H(allH2HResult, goalNumThreshold, underGoalNumThreshold, noOfM
                 else:
                     SuitableWCount += 1
 
-#               IF MOST RECENT IS MORE THAN 4 GOALS, THEN IT'S GOOD MATCH
-                if count == 0:
-                    if goalCount > 4:
-                        SuitableCount = 3
+# #               IF MOST RECENT IS MORE THAN 4 GOALS, THEN IT'S GOOD MATCH
+#                 if count == 0:
+#                     if goalCount > 4:
+#                         SuitableCount = 3
 
 
 
