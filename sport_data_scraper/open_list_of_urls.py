@@ -1,7 +1,7 @@
 import webbrowser
 import time
 
-f = open("result1.txt", "r")
+f = open("over.txt", "r")
 
 count = 0
 for url in f:
