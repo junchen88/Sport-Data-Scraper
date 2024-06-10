@@ -3,6 +3,10 @@ import re
 import webbrowser
 import time
 import tqdm
+from datetime import datetime, timedelta
+import json
+import os
+
 
 def getData(day):
     # cookies = {
@@ -50,7 +54,7 @@ def createLinks(ID):
 #         if i == 0:
 #             time.sleep(5)
 
-def getH2HResult(matchStrings):
+def getH2HResult(matchStrings, day):
     print("Finding past H2H for each match now...")
     additionalStr   = "https://d.flashscore.com.au/x/feed/df_hh_1_"
     matchData       = []
@@ -101,6 +105,14 @@ def getH2HResult(matchStrings):
         # time.sleep(1)
         # count += 1
 
+    # SAVE/WRITE TODAY'S MATCHES TO FILE
+    dateTime = datetime.today()
+    dateTime += timedelta(days=day)
+    dateStr = dateTime.strftime('%Y-%m-%d')
+    fileName = f"{dateStr}-all-matches-with-h2h"
+    fp = open(fileName, 'w')
+    json.dump(allH2HResult,fp)
+    fp.close()        
 
     return allH2HResult
 
@@ -120,9 +132,9 @@ def writeToFile(filename, webLinks):
         fp.write(link + "\n")
     fp.close()
 
-def findSuitableH2H(allH2HResult, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh):
+def findSuitableH2H(allH2HResult, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, nbttswin):
     print("filtering results now...")
-    print(goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh)
+    print(goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, nbttswin)
     # goalNumThreshold = 5
     # underGoalNumThreshold = 3
     overGoalMatch = []
@@ -130,6 +142,7 @@ def findSuitableH2H(allH2HResult, goalNumThreshold, underGoalNumThreshold, noOfM
     winMatch = []
     bothTeamToScoreMatch = []
     notBothTeamToScoreMatch = []
+    nbttswinMatch = []
 
 
 
@@ -165,12 +178,16 @@ def findSuitableH2H(allH2HResult, goalNumThreshold, underGoalNumThreshold, noOfM
             if len(goals) == 2:
 
 #               LOOP FOR SPLITTED GOAL NUMBER
-                i = 0
+                i = 0                   #counter for tracking the goal numbers
+                                        #larger than one for the h2h match
                 for goal in goals:
                     goalCount += int(goal)
+
+                    #
                     if int(goal) > 0:
                         i += 1
 
+                # IF THE TWO GOAL NUMBER FOR THE MATCH IS NOT LARGER THAN 0, THEN NOT BTTS
                 if i != 2:
                     SuitableBothTeamToScore = False
                 else:
@@ -244,14 +261,37 @@ def findSuitableH2H(allH2HResult, goalNumThreshold, underGoalNumThreshold, noOfM
         if noOfMatches >= noOfMatchesThresh and SuitableNotBothTeamToScore == True:
             notBothTeamToScoreMatch.append(createLinks(ID))
 
+        # IF nbbtswin FLAG IS ACTIVATED, THEN ADD THE RESULT THAT SATISFIES BOTH NBTTS AND WIN
+        if nbttswin:
+            if SuitableWin == True and SuitableWCount == noOfMatchesThresh:
+                if noOfMatches >= noOfMatchesThresh and SuitableNotBothTeamToScore == True:
+                    nbttswinMatch.append(createLinks(ID))
+
+
     writeToFile("over.txt", overGoalMatch)
     writeToFile("under.txt", underMatch)
     writeToFile("win.txt", winMatch)
     writeToFile("bothTeamToScore.txt", bothTeamToScoreMatch)
     writeToFile("notBothTeamToScore.txt", notBothTeamToScoreMatch)
+    if nbttswin:
+        writeToFile("nbttswin.txt", nbttswinMatch)
+    
 
-def runScraper(day, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh):
+def runScraper(day, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, nbttswin, forceFlag):
+
+    dateTime = datetime.today()
+    dateTime += timedelta(days=day)
+    dateStr = dateTime.strftime('%Y-%m-%d')
+    fileName = f"{dateStr}-all-matches-with-h2h"
 
     rawData = getData(day)
-    h2hResult = getH2HResult(rawData)
-    findSuitableH2H(h2hResult, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh)
+    h2hResult = None
+    if forceFlag:
+        h2hResult = getH2HResult(rawData, day)
+    elif fileName not in os.listdir('.'):
+        h2hResult = getH2HResult(rawData, day)
+    else:
+        fp = open(fileName)
+        h2hResult = json.load(fp)
+        fp.close()
+    findSuitableH2H(h2hResult, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, nbttswin)

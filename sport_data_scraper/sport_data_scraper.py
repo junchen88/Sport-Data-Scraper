@@ -16,7 +16,9 @@ def main():
     subparser_scraper.add_argument("--overNumOfGoals", "--o", default=5, type=int, help="Sets the over goal number threshold. Default = 5")
     subparser_scraper.add_argument("--lessNumOfGoals", "--l", default=3, type=int, help="Sets the under goal number threshold. Default = 3")
     subparser_scraper.add_argument("--matchCount", "--m", default=4, type=int, help="Sets the minimum number of matches that satisfy the threshold")
-    
+    subparser_scraper.add_argument("--nbttswin", "--nbttsw", action='store_true', help="Combines nbtts and win result")
+    subparser_scraper.add_argument("--forceFlag", "--f", action='store_true', help="Combines nbtts and win result")
+
     subparser_scraper = subparser.add_parser('open', formatter_class=argparse.RawTextHelpFormatter)
     subparser_scraper.add_argument("--openType", "--t", nargs = '*', default="o", choices=["o","u","btts","nbtts","w"],
     help= 
@@ -33,7 +35,7 @@ def main():
     print(args)
 
     if args.cmd == "scraper":
-        scraper.runScraper(args.day, args.overNumOfGoals, args.lessNumOfGoals, args.matchCount)
+        scraper.runScraper(args.day, args.overNumOfGoals, args.lessNumOfGoals, args.matchCount, args.nbttswin, args.forceFlag)
 
 
 if __name__ == "__main__":
