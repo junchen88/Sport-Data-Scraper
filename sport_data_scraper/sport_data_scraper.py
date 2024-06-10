@@ -1,5 +1,5 @@
 import argparse
-from sport_data_scraper import scraper
+from sport_data_scraper import scraper, open_list_of_urls
 
 def check_for_days_arguments():
     pass
@@ -20,7 +20,7 @@ def main():
     subparser_scraper.add_argument("--forceFlag", "--f", action='store_true', help="Combines nbtts and win result")
 
     subparser_scraper = subparser.add_parser('open', formatter_class=argparse.RawTextHelpFormatter)
-    subparser_scraper.add_argument("--openType", "--t", nargs = '*', default="o", choices=["o","u","btts","nbtts","w"],
+    subparser_scraper.add_argument("--openType", "--t", nargs = '*', default="o", choices=["o","u","btts","nbtts","w","nbttsw"],
     help= 
     """
     Sets the opening type:
@@ -29,14 +29,17 @@ def main():
         btts = both team to score
         nbtts = no both team to score
         w = a team wins consectutively
+        nbttsw = nbtts & w
     """)
 
     args=parser.parse_args()
     print(args)
 
-    if args.cmd == "scraper":
+    if args.cmd == "scraper" or args.cmd == None:
         scraper.runScraper(args.day, args.overNumOfGoals, args.lessNumOfGoals, args.matchCount, args.nbttswin, args.forceFlag)
 
+    if args.cmd == "open":
+        open_list_of_urls.runOpen(args.openType)
 
 if __name__ == "__main__":
     main()
