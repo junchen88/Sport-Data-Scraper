@@ -1,11 +1,79 @@
 import requests_html as rh
 import re
-import webbrowser
-import time
-import tqdm
 from datetime import datetime, timedelta
 import json
 import os
+from requests_html import AsyncHTMLSession
+from tqdm.asyncio import tqdm as async_tqdm
+import asyncio
+
+#get and filter for useful data
+async def getMatchH2H(asession, matchID):
+    H2HResult       = {}
+    additionalStr   = "https://d.flashscore.com.au/x/feed/df_hh_1_"
+    headers         = {
+        "Host": "d.flashscore.com.au",
+        "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:93.0) Gecko/20100101 Firefox/93.0",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Referer": "https://d.flashscore.com.au/x/feed/proxy-fetch",
+        "x-fsign": "SW9D1eZo",
+        "Connection": "keep-alive",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "TE": "trailers",
+    }
+    completeUrl = additionalStr + matchID
+
+    # Asynchronous requests to avoid unnecessary CPU wait time
+    # Using AsyncHTMLSession instead of HTMLSession
+    response = await asession.get(completeUrl, headers=headers, stream=True)
+    # print(response.text)
+    goalData        = re.search(r'Head-to-head(.*?)Home¬IS÷¬~KB÷Last matches:', response.text)
+    homeAwayData    = re.findall(r'÷Last matches: (.*?)¬', response.text)
+
+    # print(H2HData.group(0))
+    H2HResultWithID = re.findall(r'¬KL÷(.*?)¬', goalData.group(0))
+
+    H2HTeamData     = re.findall(r'KJ÷(.*?)¬KK÷', goalData.group(0))
+
+    # print(H2HResult)
+    H2HResultWithID.append(matchID)
+    # print(H2HResultWithID)
+    H2HResult["H2HResultWithID"] = H2HResultWithID
+    H2HResult['home']            = homeAwayData[0]
+    H2HResult['away']            = homeAwayData[1]
+    H2HResult['H2HTeamData']     = H2HTeamData
+
+    return H2HResult
+
+# write filtered data to a file with today's date
+async def getAllMatchesH2H(allMatchesID, day):
+    print("Finding past H2H for each match now...")
+    
+    asession = AsyncHTMLSession()
+    
+    # create a list of asynchronous task to execute
+    tasks = [getMatchH2H(asession, matchID) for matchID in allMatchesID]
+
+    # executes in the order of the awaits in the list
+    # the result is an aggregate list of returned values
+    allH2HResult = await async_tqdm.gather(*tasks)
+    await asession.close()
+
+    # SAVE/WRITE TODAY'S MATCHES TO FILE
+    dateTime = datetime.today()
+    dateTime += timedelta(days=day)
+    dateStr = dateTime.strftime('%Y-%m-%d')
+    fileName = f"{dateStr}-all-matches-with-h2h.txt"
+    fp = open(fileName, 'w')
+    json.dump(allH2HResult,fp)
+    fp.close()        
+
+    return allH2HResult
+
 
 
 def getData(day):
@@ -35,10 +103,10 @@ def getData(day):
     result          = response.text
     # print(result)
     # print(len(result))
-    matchStrings    = re.findall(r'~AA÷(.*?)¬AD÷', result)
-    print(str(len(matchStrings)) + " matches found")
+    allMatchesID    = re.findall(r'~AA÷(.*?)¬AD÷', result)
+    print(str(len(allMatchesID)) + " matches found")
     session.close()
-    return matchStrings
+    return allMatchesID
 
 def createLinks(ID):
     linkTemplate = "https://www.flashscore.com.au/match/"
@@ -46,75 +114,7 @@ def createLinks(ID):
 
     return link
 
-# def openLinks():
-#     i = 0
-#     for links in createLinks():
-#         webbrowser.open(links, new=0, autoraise=True)
-#         i += 1
-#         if i == 0:
-#             time.sleep(5)
 
-def getH2HResult(matchStrings, day):
-    print("Finding past H2H for each match now...")
-    additionalStr   = "https://d.flashscore.com.au/x/feed/df_hh_1_"
-    matchData       = []
-    headers         = {
-        "Host": "d.flashscore.com.au",
-        "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:93.0) Gecko/20100101 Firefox/93.0",
-        "Accept": "*/*",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Referer": "https://d.flashscore.com.au/x/feed/proxy-fetch",
-        "x-fsign": "SW9D1eZo",
-        "Connection": "keep-alive",
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "TE": "trailers",
-    }
-
-    allH2HResult    = []
-    # count = 0
-    for element in tqdm.tqdm(matchStrings):
-        H2HResult       = {}
-        # if count > 10:
-        #     break
-        session = rh.HTMLSession()
-        complete = additionalStr + element
-        matchData.append(complete)
-        response = session.get(complete, headers=headers, stream=True)
-        # print(response.text)
-        goalData        = re.search(r'Head-to-head(.*?)Home¬IS÷¬~KB÷Last matches:', response.text)
-        homeAwayData    = re.findall(r'÷Last matches: (.*?)¬', response.text)
-
-        # print(H2HData.group(0))
-        H2HResultWithID = re.findall(r'¬KL÷(.*?)¬', goalData.group(0))
-
-        H2HTeamData     = re.findall(r'KJ÷(.*?)¬KK÷', goalData.group(0))
-
-        # print(H2HResult)
-        H2HResultWithID.append(element)
-        # print(H2HResultWithID)
-        H2HResult["H2HResultWithID"] = H2HResultWithID
-        H2HResult['home']            = homeAwayData[0]
-        H2HResult['away']            = homeAwayData[1]
-        H2HResult['H2HTeamData']     = H2HTeamData
-        allH2HResult.append(H2HResult)
-        # print(allH2HResult[0])
-        session.close()
-        # time.sleep(1)
-        # count += 1
-
-    # SAVE/WRITE TODAY'S MATCHES TO FILE
-    dateTime = datetime.today()
-    dateTime += timedelta(days=day)
-    dateStr = dateTime.strftime('%Y-%m-%d')
-    fileName = f"{dateStr}-all-matches-with-h2h"
-    fp = open(fileName, 'w')
-    json.dump(allH2HResult,fp)
-    fp.close()        
-
-    return allH2HResult
 
 def homeOrAway(goals, home, away):
     if int(goals[0]) > int(goals[1]):
@@ -282,14 +282,14 @@ def runScraper(day, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, 
     dateTime = datetime.today()
     dateTime += timedelta(days=day)
     dateStr = dateTime.strftime('%Y-%m-%d')
-    fileName = f"{dateStr}-all-matches-with-h2h"
+    fileName = f"{dateStr}-all-matches-with-h2h.txt"
 
     rawData = getData(day)
     h2hResult = None
     if forceFlag:
-        h2hResult = getH2HResult(rawData, day)
+        h2hResult = asyncio.run(getAllMatchesH2H(rawData, day))
     elif fileName not in os.listdir('.'):
-        h2hResult = getH2HResult(rawData, day)
+        h2hResult = asyncio.run(getAllMatchesH2H(rawData, day))
     else:
         fp = open(fileName)
         h2hResult = json.load(fp)
