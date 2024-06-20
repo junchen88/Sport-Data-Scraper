@@ -75,11 +75,89 @@ async def getAllMatchesH2H(allMatchesID, day):
     return allH2HResult
 
 
+async def getLeagueTeamData(asession, firstMatchID):
+    """Returns a list containing information for each football team: 
+    [[team name, team id, match played, goal scored:conceded, avg goal per match], [same information as before], ...]
+    if avg goal per match = -1, this means the team have not played more than 5 matches in the league"""
+
+    H2HResult       = {}
+    completeUrl   = f"https://d.flashscore.com.au/x/feed/df_to_1_{firstMatchID}_1"
+    headers         = {
+        "Host": "d.flashscore.com.au",
+        "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:93.0) Gecko/20100101 Firefox/93.0",
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Referer": "https://d.flashscore.com.au/x/feed/proxy-fetch",
+        "x-fsign": "SW9D1eZo",
+        "Connection": "keep-alive",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "TE": "trailers",
+    }
+
+
+    # Asynchronous requests to avoid unnecessary CPU wait time
+    # Using AsyncHTMLSession instead of HTMLSession
+    # print(asession)
+    response = await asession.get(completeUrl, headers=headers, stream=True)
+    
+    # results may contain empty list as it doesn't have standings, we need to remove it!
+    # [(team name, team id, match played, goal scored:conceded), (same information as before), ...]
+    allUsefulTeamData    = re.findall(r'TN÷(.*?)¬TI÷.*?TIU÷(.*?)¬TM÷(.*?)¬TW÷.*?TG÷(.*?)¬TP', response.text)
+
+    if allUsefulTeamData:
+        index = 0
+        while index<len(allUsefulTeamData):
+
+            allUsefulTeamData[index] = [usefulTeamData for usefulTeamData in allUsefulTeamData[index]]
+            
+            splitted = allUsefulTeamData[index][3].split(":")
+            totalGoals = int(splitted[0]) + int(splitted[1])
+            allUsefulTeamData[index][2]= int(allUsefulTeamData[index][2])
+            if allUsefulTeamData[index][2] >= 5:
+                avgGoalPerMatch = totalGoals/int(allUsefulTeamData[index][2])
+                allUsefulTeamData[index].append(avgGoalPerMatch) # add avg goal information
+            else:
+                avgGoalPerMatch = -1 # not enough match played
+                allUsefulTeamData[index].append(avgGoalPerMatch)
+            index += 1
+
+    return allUsefulTeamData 
+
+
+async def getLeagueStanding(allFirstMatchOfLeagueID, day):
+    print("Looking at team's data now...")
+    
+    asession = AsyncHTMLSession()
+    
+    # create a list of asynchronous task to execute
+    tasks = [getLeagueTeamData(asession, firstMatchID) for firstMatchID in allFirstMatchOfLeagueID]
+
+    # executes in the order of the awaits in the list
+    # the result is an aggregate list of returned values
+    allTeamUsefulData = await async_tqdm.gather(*tasks, desc="getting football team data")
+    await asession.close()
+    
+    # combines a list of list of lists into a single list of lists and removes
+    # empty list
+    combinedAllTeamUsefulData = []
+    [combinedAllTeamUsefulData.extend(sublist) for sublist in allTeamUsefulData]
+
+    # SAVE/WRITE TODAY'S MATCHES TO FILE
+    dateTime = datetime.today()
+    dateTime += timedelta(days=day)
+    dateStr = dateTime.strftime('%Y-%m-%d')
+    fileName = f"{dateStr}-all-team-useful-data.txt"
+    fp = open(fileName, 'w')
+    json.dump(combinedAllTeamUsefulData,fp)
+    fp.close()        
+
+    return combinedAllTeamUsefulData
 
 def getData(day):
-    # cookies = {
-    #     "Cookie": "OptanonConsent=isGpcEnabled=0&datestamp=Sun+Nov+07+2021+00%3A01%3A15+GMT%2B0800+(Australian+Western+Standard+Time)&version=6.19.0&isIABGlobal=false&hosts=&landingPath=NotLandingPage"
-    # }
+
     session = rh.HTMLSession()
     headers = {
         "Accept": "*/*",
@@ -105,8 +183,21 @@ def getData(day):
     # print(len(result))
     allMatchesID    = re.findall(r'~AA÷(.*?)¬AD÷', result)
     print(str(len(allMatchesID)) + " matches found")
+
+    # Using first match ID from each league is easier to find the data
+    # data between ZL÷ and ¬OAJ÷ pattern is the league url component
+    # match ID within the league is usually after the url component
+    # and before the next league url component.
+    # Since we know the match ID is between ~AA÷ and ¬AD÷,
+    # we can find the first match ID from each league using the pattern
+    # below: after ¬OAJ÷ pattern, any characters can exist between the
+    # first pattern and the ~AA÷ pattern, the ID we wanted is located
+    # between ~AA÷ and ¬AD÷
+    allFirstMatchOfLeagueID    = re.findall(r'¬OAJ÷.*?~AA÷(.*?)¬AD÷', result)
+
+    print(str(len(allFirstMatchOfLeagueID)) + " leagues found")
     session.close()
-    return allMatchesID
+    return allMatchesID, allFirstMatchOfLeagueID
 
 def createLinks(ID):
     linkTemplate = "https://www.flashscore.com.au/match/"
@@ -126,11 +217,30 @@ def homeOrAway(goals, home, away):
     else:
         return away
 
-def writeToFile(filename, webLinks):
+def writeToFile(filename, suitableData):
     fp = open(filename, 'w')
-    for link in webLinks:
-        fp.write(link + "\n")
+    for data in suitableData:
+        if type(data) is list:
+            for element in data:
+                fp.write(str(element) + ", ")
+            fp.write("\n")
+        else:
+            fp.write(data + "\n")
     fp.close()
+
+def findSuitableTeam(allTeamUsefulData, goalNumThreshold):
+    print("filtering team results now...")
+    suitableTeam = []
+
+    for teamUsefulData in allTeamUsefulData:
+        if teamUsefulData[4] > goalNumThreshold:
+            teamUsefulData[1] = "https://www.flashscore.com.au" + teamUsefulData[1]
+            suitableTeam.append(teamUsefulData)
+            
+    writeToFile("teamOver.txt", suitableTeam)
+
+
+            
 
 def findSuitableH2H(allH2HResult, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, nbttswin):
     print("filtering results now...")
@@ -282,16 +392,28 @@ def runScraper(day, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, 
     dateTime = datetime.today()
     dateTime += timedelta(days=day)
     dateStr = dateTime.strftime('%Y-%m-%d')
-    fileName = f"{dateStr}-all-matches-with-h2h.txt"
+    H2HfileName = f"{dateStr}-all-matches-with-h2h.txt"
 
-    rawData = getData(day)
-    h2hResult = None
+    allMatchesID, allFirstMatchOfLeagueID = getData(day)
+    # h2hResult = None
+    # if forceFlag:
+    #     h2hResult = asyncio.run(getAllMatchesH2H(allMatchesID, day))
+    # elif H2HfileName not in os.listdir('.'):
+    #     h2hResult = asyncio.run(getAllMatchesH2H(allMatchesID, day))
+    # else:
+    #     fp = open(H2HfileName)
+    #     h2hResult = json.load(fp)
+    #     fp.close()
+    # findSuitableH2H(h2hResult, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, nbttswin)
+    
+
+    teamFileName = f"{dateStr}-all-team-useful-data.txt"
     if forceFlag:
-        h2hResult = asyncio.run(getAllMatchesH2H(rawData, day))
-    elif fileName not in os.listdir('.'):
-        h2hResult = asyncio.run(getAllMatchesH2H(rawData, day))
+        allTeamUsefulData =     asyncio.run(getLeagueStanding(allFirstMatchOfLeagueID, day))
+    elif teamFileName not in os.listdir('.'):
+        allTeamUsefulData =     asyncio.run(getLeagueStanding(allFirstMatchOfLeagueID, day))
     else:
-        fp = open(fileName)
-        h2hResult = json.load(fp)
+        fp = open(teamFileName)
+        allTeamUsefulData = json.load(fp)
         fp.close()
-    findSuitableH2H(h2hResult, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, nbttswin)
+    findSuitableTeam(allTeamUsefulData,goalNumThreshold)
