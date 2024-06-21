@@ -18,6 +18,8 @@ def runOpen(fileTypeList):
             fileName = "win"
         elif fileType == "nbttsw":
             fileName = 'nbttswin'
+        elif fileType == "team":
+            fileName = 'teamOver'
 
         try:
             f = open(f"{fileName}.txt", "r")
@@ -27,6 +29,10 @@ def runOpen(fileTypeList):
 
         count = 0
         for url in f:
+            print(url)
+            
+            if fileType == "team":
+                url = url.split(",")[1]
             line = url.strip()
             webbrowser.open(line, new=0, autoraise=True)
             count += 1

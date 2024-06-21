@@ -20,7 +20,7 @@ def main():
     subparser_scraper.add_argument("--forceFlag", "--f", action='store_true', help="Combines nbtts and win result")
 
     subparser_scraper = subparser.add_parser('open', formatter_class=argparse.RawTextHelpFormatter)
-    subparser_scraper.add_argument("--openType", "--t", nargs = '*', default="o", choices=["o","u","btts","nbtts","w","nbttsw"],
+    subparser_scraper.add_argument("--openType", "--t", nargs = '*', default="o", choices=["o","u","btts","nbtts","w","nbttsw", "team"],
     help= 
     """
     Sets the opening type:

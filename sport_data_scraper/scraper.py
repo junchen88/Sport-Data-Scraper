@@ -228,15 +228,16 @@ def writeToFile(filename, suitableData):
             fp.write(data + "\n")
     fp.close()
 
-def findSuitableTeam(allTeamUsefulData, goalNumThreshold):
+def findSuitableTeam(allTeamUsefulData, goalNumThreshold, todaysTeamName):
     print("filtering team results now...")
     suitableTeam = []
 
     for teamUsefulData in allTeamUsefulData:
-        if teamUsefulData[4] > goalNumThreshold:
-            teamUsefulData[1] = "https://www.flashscore.com.au" + teamUsefulData[1]
-            suitableTeam.append(teamUsefulData)
-            
+        if teamUsefulData[0] in todaysTeamName:
+            if teamUsefulData[4] > goalNumThreshold:
+                teamUsefulData[1] = "https://www.flashscore.com.au" + teamUsefulData[1]
+                suitableTeam.append(teamUsefulData)
+    suitableTeam.sort(key = lambda x: x[4], reverse=True)
     writeToFile("teamOver.txt", suitableTeam)
 
 
@@ -254,11 +255,13 @@ def findSuitableH2H(allH2HResult, goalNumThreshold, underGoalNumThreshold, noOfM
     notBothTeamToScoreMatch = []
     nbttswinMatch = []
 
-
+    todaysTeamName = []
 
 #   LOOP FOR EACH MATCH
     # print(allH2HResult)
     for result in allH2HResult:
+        todaysTeamName.append(result['home'])
+        todaysTeamName.append(result['away'])
 
         noOfMatches   = 0
         SuitableCount   = 0
@@ -385,6 +388,7 @@ def findSuitableH2H(allH2HResult, goalNumThreshold, underGoalNumThreshold, noOfM
     writeToFile("notBothTeamToScore.txt", notBothTeamToScoreMatch)
     if nbttswin:
         writeToFile("nbttswin.txt", nbttswinMatch)
+    return todaysTeamName
     
 
 def runScraper(day, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, nbttswin, forceFlag):
@@ -395,16 +399,16 @@ def runScraper(day, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, 
     H2HfileName = f"{dateStr}-all-matches-with-h2h.txt"
 
     allMatchesID, allFirstMatchOfLeagueID = getData(day)
-    # h2hResult = None
-    # if forceFlag:
-    #     h2hResult = asyncio.run(getAllMatchesH2H(allMatchesID, day))
-    # elif H2HfileName not in os.listdir('.'):
-    #     h2hResult = asyncio.run(getAllMatchesH2H(allMatchesID, day))
-    # else:
-    #     fp = open(H2HfileName)
-    #     h2hResult = json.load(fp)
-    #     fp.close()
-    # findSuitableH2H(h2hResult, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, nbttswin)
+    h2hResult = None
+    if forceFlag:
+        h2hResult = asyncio.run(getAllMatchesH2H(allMatchesID, day))
+    elif H2HfileName not in os.listdir('.'):
+        h2hResult = asyncio.run(getAllMatchesH2H(allMatchesID, day))
+    else:
+        fp = open(H2HfileName)
+        h2hResult = json.load(fp)
+        fp.close()
+    todaysTeamName = findSuitableH2H(h2hResult, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, nbttswin)
     
 
     teamFileName = f"{dateStr}-all-team-useful-data.txt"
@@ -416,4 +420,4 @@ def runScraper(day, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, 
         fp = open(teamFileName)
         allTeamUsefulData = json.load(fp)
         fp.close()
-    findSuitableTeam(allTeamUsefulData,goalNumThreshold)
+    findSuitableTeam(allTeamUsefulData,goalNumThreshold, todaysTeamName)
