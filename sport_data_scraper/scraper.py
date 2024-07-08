@@ -77,7 +77,7 @@ async def getAllMatchesH2H(allMatchesID, day):
 
 async def getLeagueTeamData(asession, firstMatchID):
     """Returns a list containing information for each football team: 
-    [[team name, team id, match played, goal scored:conceded, avg goal per match], [same information as before], ...]
+    [[team name, team id, match played, goal scored:conceded, avg goal per match, team no goal flag], [same information as before], ...]
     if avg goal per match = -1, this means the team have not played more than 5 matches in the league"""
 
     H2HResult       = {}
@@ -116,12 +116,27 @@ async def getLeagueTeamData(asession, firstMatchID):
             splitted = allUsefulTeamData[index][3].split(":")
             totalGoals = int(splitted[0]) + int(splitted[1])
             allUsefulTeamData[index][2]= int(allUsefulTeamData[index][2])
-            if allUsefulTeamData[index][2] >= 5:
-                avgGoalPerMatch = totalGoals/int(allUsefulTeamData[index][2])
+            matchPlayed = allUsefulTeamData[index][2]
+
+            if matchPlayed >= 5:
+                avgGoalPerMatch = totalGoals/matchPlayed
                 allUsefulTeamData[index].append(avgGoalPerMatch) # add avg goal information
+                
+                # 10% buffer
+                if int(splitted[0]) <= 0.1*matchPlayed or int(splitted[1]) <= 0.1*matchPlayed:
+                    isNoGoalScoredFlag = True
+                    allUsefulTeamData[index].append(isNoGoalScoredFlag)
+
+                else:
+                    isNoGoalScoredFlag = False
+                    allUsefulTeamData[index].append(isNoGoalScoredFlag)
+
             else:
                 avgGoalPerMatch = -1 # not enough match played
                 allUsefulTeamData[index].append(avgGoalPerMatch)
+                isNoGoalScoredFlag = False
+                allUsefulTeamData[index].append(isNoGoalScoredFlag)
+
             index += 1
 
     return allUsefulTeamData 
@@ -231,14 +246,19 @@ def writeToFile(filename, suitableData):
 def findSuitableTeam(allTeamUsefulData, goalNumThreshold, todaysTeamName):
     print("filtering team results now...")
     suitableTeam = []
-
+    suitableNoGoalTeam = []
     for teamUsefulData in allTeamUsefulData:
         if teamUsefulData[0] in todaysTeamName:
             if teamUsefulData[4] > goalNumThreshold:
                 teamUsefulData[1] = "https://www.flashscore.com.au" + teamUsefulData[1]
                 suitableTeam.append(teamUsefulData)
+            if teamUsefulData[5] == True:
+                teamUsefulData[1] = "https://www.flashscore.com.au" + teamUsefulData[1]
+                suitableNoGoalTeam.append(teamUsefulData)
+        
     suitableTeam.sort(key = lambda x: x[4], reverse=True)
     writeToFile("teamOver.txt", suitableTeam)
+    writeToFile("teamNoGoal.txt", suitableNoGoalTeam)
 
 
             
@@ -399,6 +419,9 @@ def runScraper(day, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, 
     H2HfileName = f"{dateStr}-all-matches-with-h2h.txt"
 
     allMatchesID, allFirstMatchOfLeagueID = getData(day)
+
+    # get h2h stats
+    #----------------------------------------------------------------------------------------
     h2hResult = None
     if forceFlag:
         h2hResult = asyncio.run(getAllMatchesH2H(allMatchesID, day))
@@ -409,8 +432,11 @@ def runScraper(day, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, 
         h2hResult = json.load(fp)
         fp.close()
     todaysTeamName = findSuitableH2H(h2hResult, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, nbttswin)
-    
+    #----------------------------------------------------------------------------------------
 
+    # get team stats
+    #-----------------------------------------------------------------------------------------
+    allTeamUsefulData = None
     teamFileName = f"{dateStr}-all-team-useful-data.txt"
     if forceFlag:
         allTeamUsefulData =     asyncio.run(getLeagueStanding(allFirstMatchOfLeagueID, day))
@@ -421,3 +447,4 @@ def runScraper(day, goalNumThreshold, underGoalNumThreshold, noOfMatchesThresh, 
         allTeamUsefulData = json.load(fp)
         fp.close()
     findSuitableTeam(allTeamUsefulData,goalNumThreshold, todaysTeamName)
+    #-----------------------------------------------------------------------------------------
